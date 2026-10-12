@@ -1,5 +1,53 @@
 # Verification and acceptance report
 
+## Live EC2/GitHub verification — PR #1
+
+The historical local-only report below predates EC2 provisioning. Current live
+evidence supersedes its EC2/GitHub-blocked statements for the first deployment:
+
+- SnippetShelf PR #1 build run `38224410516`: successful.
+- Trusted deploy run `38224541089`: deployment job successful.
+- Deployed commit: `a95f85b5f76576dfc2181a5f0fe468d5c0ada3e0`.
+- Deployment ID: `0380e745-fbe4-4603-8db7-34766160390d`.
+- Image: `ghcr.io/vishalsharma21803/snippetshelf@sha256:251675b7cf609cc104386c0fc9776b777f1728b0bcff5006ef2139e8a785364a`.
+- EC2 API/worker active; PostgreSQL running with persistent volume; public
+  `/api/previews` reports PR #1 healthy.
+- `http://13.63.54.222/pr-1/`, both referenced JavaScript/CSS assets and
+  `/pr-1/healthz` returned HTTP 200.
+- Headless Playwright Chromium loaded the live preview with rendered application
+  content, expected title and zero page errors. Root dashboard displayed `PR #1`.
+- GitHub Actions bot posted ready preview URL on PR #1.
+
+Earlier build `38223724316` successfully pushed the image but failed at the
+workflow's automatic package-visibility step. Removed that invalid operation;
+owner set the GHCR package Public, committed and pushed the fix. Latest pipeline
+published metadata and called the EC2 API successfully.
+
+Still unverified on the real GitHub/EC2 path: a subsequent application-change
+replacement at the same URL, PR-close cleanup, and full host reboot recovery.
+HTTP/plaintext transport remains an explicitly accepted personal-MVP limitation;
+no TLS, production hardening, or comprehensive security certification claim.
+
+## Live concurrent preview verification — PR #2
+
+The initial one-preview throttle was an operational setting, not an architectural
+constraint. It rejected PR #2 with HTTP 429 while PR #1 was healthy. The EC2
+runtime setting was changed to `MAX_ACTIVE_PREVIEWS=2` and the service restarted.
+The already-published PR #2 image was then submitted to the same API without
+closing PR #1.
+
+- PR #1 remained healthy at `http://13.63.54.222/pr-1/`.
+- PR #2 deployment `b9b8defc-07a7-47b3-87f2-2b132882e3cb` became healthy.
+- PR #2 served at `http://13.63.54.222/pr-2/` with HTTP 200.
+- Both `/pr-1/` and `/pr-2/` returned HTTP 200 in the same verification pass.
+- EC2 showed two managed containers, each using its corresponding image digest.
+- Public preview list contained both `pr-1` and `pr-2` healthy records.
+
+The PR #2 GitHub deployment job still has a failure comment from the earlier
+capacity rejection. Rerunning that trusted deploy job is expected to be
+idempotent and update the comment to the live `/pr-2/` URL; no image rebuild is
+required.
+
 ## Result
 
 **Local MVP verified; whole cloud release NOT VERIFIED.** Production-readiness is
