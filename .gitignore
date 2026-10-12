@@ -9,3 +9,5 @@ data/
 infra/routes/preview-*.yml
 infra/routes/*.tmp
 *.tsbuildinfo
+*.pem
+*.key

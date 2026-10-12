@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Config } from "../config/config.js";
 
@@ -31,13 +30,15 @@ export function validateCreateRequest(value: unknown, config: Config) {
 }
 
 export function previewIdentity(repository: string, pullRequestNumber: number) {
-  const normalized = repository.toLowerCase();
-  const hash = createHash("sha256").update(normalized).digest("hex").slice(0, 10);
-  const safe = normalized.replace(/[^a-z0-9]+/g, "-").slice(0, 32).replace(/-$/, "");
-  const id = `${safe}-${hash}-pr-${pullRequestNumber}`;
-  return { id, hostname: id, containerName: `preview-${id}` };
+  // The platform accepts one configured repository, so PR number is the stable
+  // public route identity and cannot collide within the supported scope.
+  void repository;
+  const id = `pr-${pullRequestNumber}`;
+  return { id, pathPrefix: `/${id}`, containerName: `preview-${id}` };
 }
 
-export function previewUrl(hostname: string, config: Pick<Config, "PREVIEW_SCHEME" | "PREVIEW_BASE_DOMAIN" | "PREVIEW_PORT">) {
-  return `${config.PREVIEW_SCHEME}://${hostname}.${config.PREVIEW_BASE_DOMAIN}${config.PREVIEW_PORT ? `:${config.PREVIEW_PORT}` : ""}`;
+export function previewUrl(pathPrefix: string, config: Pick<Config, "PREVIEW_BASE_URL" | "PREVIEW_TRAILING_SLASH">) {
+  const base = config.PREVIEW_BASE_URL.replace(/\/+$/, "");
+  const path = `/${pathPrefix.replace(/^\/+|\/+$/g, "")}`;
+  return `${base}${path}${config.PREVIEW_TRAILING_SLASH ? "/" : ""}`;
 }

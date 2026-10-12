@@ -61,14 +61,15 @@ test("HTTP health is host-side, rejects redirects, bounds timeouts and cancels r
   assert.ok(Date.now() - start < 1500);
 });
 
-test("file-provider route publishes valid atomic YAML, replaces, lists, and removes", async t => {
+test("file-provider path route publishes atomic YAML with strip-prefix, replaces, lists, and removes", async t => {
   const directory = await mkdtemp("/tmp/omnirush/routes-");
   t.after(() => rm(directory, { recursive: true, force: true }));
   const routes = new FileRoutes(directory);
-  await routes.activate("pr-1", "pr-1.preview.localhost", "http://172.18.0.2:3000");
+  await routes.activate("pr-1", "/pr-1", "http://172.18.0.2:3000");
   const first = JSON.parse(await readFile(join(directory, "preview-pr-1.yml"), "utf8"));
-  assert.equal(first.http.routers["preview-pr-1"].rule, "Host(`pr-1.preview.localhost`)");
-  await routes.activate("pr-1", "pr-1.preview.localhost", "http://172.18.0.3:3000");
+  assert.equal(first.http.routers["preview-pr-1"].rule, "Path(`/pr-1`) || PathPrefix(`/pr-1/`)");
+  assert.deepEqual(first.http.middlewares["preview-pr-1-strip"].stripPrefix.prefixes, ["/pr-1"]);
+  await routes.activate("pr-1", "/pr-1", "http://172.18.0.3:3000");
   const replaced = JSON.parse(await readFile(join(directory, "preview-pr-1.yml"), "utf8"));
   assert.equal(replaced.http.services["preview-pr-1"].loadBalancer.servers[0].url, "http://172.18.0.3:3000");
   assert.deepEqual(await readdir(directory), ["preview-pr-1.yml"]);

@@ -5,8 +5,9 @@ docker compose -f infra/docker-compose.yml up -d --build
 ```
 
 - PostgreSQL: `127.0.0.1:55432`, database `preview_platform`, user/password `preview`.
-- Traefik: `http://127.0.0.1:18080`; dashboard application:
-  `http://dashboard.preview.localhost:18080`. No Traefik admin dashboard is exposed.
+- Traefik: `http://127.0.0.1:18080`; dashboard application is served at `/`.
+  Preview paths use `/pr-<number>/`; `/api/*` and `/healthz` route directly to
+  the host API. No Traefik admin dashboard is exposed.
 - Start the host API on port `18081`. Vite (`npm run dev -w @preview/dashboard`)
   proxies `/api` and `/healthz` to `127.0.0.1:18081`.
 - Built dashboard Nginx proxies public reads to `host.docker.internal:18081` using

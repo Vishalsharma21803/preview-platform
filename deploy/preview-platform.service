@@ -1,0 +1,20 @@
+[Unit]
+Description=Preview Platform API and deployment worker
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/preview-platform/app
+EnvironmentFile=/opt/preview-platform/config/platform.env
+ExecStart=/usr/bin/node --env-file=/opt/preview-platform/config/platform.env /opt/preview-platform/app/apps/api/dist/index.js
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

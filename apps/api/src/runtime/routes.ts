@@ -9,15 +9,17 @@ export class FileRoutes {
     if (!/^[a-z0-9-]{1,100}$/.test(id)) throw new Error("route operation failed");
     return join(this.directory, `preview-${id}.yml`);
   }
-  async activate(id: string, hostname: string, endpoint: string) {
+  async activate(id: string, pathPrefix: string, endpoint: string) {
     const destination = this.path(id);
     const temporary = `${destination}.${randomUUID()}.tmp`;
     try {
       await mkdir(this.directory, { recursive: true });
-      if (!/^[a-z0-9.-]+$/.test(hostname) || !/^http:\/\/\d+\.\d+\.\d+\.\d+:\d+$/.test(endpoint)) throw new Error();
+      if (!/^\/pr-[1-9]\d*$/.test(pathPrefix) || !/^http:\/\/\d+\.\d+\.\d+\.\d+:\d+$/.test(endpoint)) throw new Error();
       const key = `preview-${id}`;
+      const middleware = `${key}-strip`;
       await writeFile(temporary, JSON.stringify({ http: {
-        routers: { [key]: { rule: `Host(\`${hostname}\`)`, entryPoints: ["web"], service: key } },
+        routers: { [key]: { rule: `Path(\`${pathPrefix}\`) || PathPrefix(\`${pathPrefix}/\`)`, entryPoints: ["web"], middlewares: [middleware], service: key } },
+        middlewares: { [middleware]: { stripPrefix: { prefixes: [pathPrefix] } } },
         services: { [key]: { loadBalancer: { servers: [{ url: endpoint }] } } },
       } }), { flag: "wx", mode: 0o644 });
       await rename(temporary, destination);

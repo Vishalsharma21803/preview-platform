@@ -99,7 +99,7 @@ export class DeploymentWorker {
         this.config.HEALTH_CHECK_ATTEMPTS, this.config.HEALTH_CHECK_INTERVAL_MS))) throw new Error("preview health check failed");
       await ensureCurrent();
       const current = await this.repository.getPreview(deployment.previewId);
-      await this.runtime.activate(deployment.previewId, `${current!.hostname}.${this.config.PREVIEW_BASE_DOMAIN}`, endpoint);
+      await this.runtime.activate(deployment.previewId, current!.pathPrefix, endpoint);
       await ensureCurrent();
       await stopHeartbeat();
       // A false result (including a concurrent supersession/delete) is terminal for this attempt.
@@ -140,7 +140,7 @@ export class DeploymentWorker {
         if (!preview.containerPort) throw new Error("runtime operation failed");
         try {
           const endpoint = await this.runtime.endpoint({ id: preview.containerId, name: "", previewId: preview.id }, preview.containerPort);
-          await this.runtime.activate(preview.id, `${preview.hostname}.${this.config.PREVIEW_BASE_DOMAIN}`, endpoint);
+          await this.runtime.activate(preview.id, preview.pathPrefix, endpoint);
           await this.repository.recordRuntimeState(preview.id, preview.containerId, "running");
         } catch (error) {
           if (!(error instanceof RuntimeUnavailableError)) throw error;

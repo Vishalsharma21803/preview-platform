@@ -1,10 +1,25 @@
 http:
   routers:
-    dashboard:
-      rule: Host(`dashboard.preview.localhost`)
+    api:
+      rule: Path(`/api`) || PathPrefix(`/api/`)
       entryPoints: [web]
+      priority: 100
+      service: api
+    health:
+      rule: Path(`/healthz`)
+      entryPoints: [web]
+      priority: 100
+      service: api
+    dashboard:
+      rule: PathPrefix(`/`)
+      entryPoints: [web]
+      priority: 1
       service: dashboard
   services:
+    api:
+      loadBalancer:
+        servers:
+          - url: http://host.docker.internal:18081
     dashboard:
       loadBalancer:
         servers:

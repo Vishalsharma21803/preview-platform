@@ -29,10 +29,10 @@ one Docker daemon, and one routes directory for this deployment.
   filesystem supporting atomic rename. Routes are YAML files containing JSON.
 - `TRAEFIK_NETWORK`: existing user-defined bridge network shared by Traefik and
   preview containers (default `traefik-public`).
-- `PREVIEW_BASE_DOMAIN`: DNS suffix resolving to the Traefik host. API responses
-   default to HTTP. `PREVIEW_PORT=18080` includes the local proxy port in URLs.
-   `PREVIEW_SCHEME=https` only changes response URLs; TLS termination
-  must be configured externally. Generated routes use Traefik's `web` entrypoint.
+- `PREVIEW_BASE_URL`: public HTTP(S) origin or IP for Traefik, defaulting to
+  `http://13.63.54.222`.
+- `PREVIEW_TRAILING_SLASH`: controls whether generated URLs end in `/` (default
+  `true`). Preview URLs use `/pr-<number>/`; no hostname subdomains are required.
 
 ## Traefik configuration required outside this backend
 
@@ -47,8 +47,8 @@ Set these static options, with the host `ROUTES_DIR` mounted at the directory be
 Only Traefik publishes a public port. Preview containers publish **no host ports**
 and carry `traefik.enable=false`, so the Docker provider cannot expose candidates.
 Traefik's file provider points to `http://<container bridge IPv4>:<containerPort>`.
-No Docker provider is necessary for preview routes. DNS must resolve generated
-preview hostnames to this proxy. Existing Docker-provider-labelled preview
+No Docker provider is necessary for preview routes. The public base URL must
+resolve to this proxy. Existing Docker-provider-labelled preview
 containers from older versions must be retired before using this setup, to avoid
 old Docker-provider routes competing with the new file-provider routes.
 

@@ -111,8 +111,7 @@ test("real Docker bridge health and Traefik atomic file-provider activation/deac
     "--providers.file.directory=/routes", "--providers.file.watch=true", "--providers.providersThrottleDuration=100ms", "--entrypoints.web.address=:8080");
   const proxyIp = JSON.parse(await docker("inspect", proxyId))[0].NetworkSettings.Networks[network].IPAddress;
   const routeStatus = () => new Promise<number>((resolve, reject) => {
-    // http.request permits an explicit Host independently of the target IP on all supported Node versions.
-    const request = httpRequest(`http://${proxyIp}:8080/healthz`, { headers: { Host: "pr-1.preview.localhost" }, timeout: 1000 }, response => {
+    const request = httpRequest(`http://${proxyIp}:8080/pr-1/healthz`, { timeout: 1000 }, response => {
       response.resume(); resolve(response.statusCode ?? 0);
     });
     request.on("error", reject); request.on("timeout", () => request.destroy(new Error("proxy timeout"))); request.end();
@@ -127,7 +126,7 @@ test("real Docker bridge health and Traefik atomic file-provider activation/deac
     assert.fail(`Traefik did not return ${expected}; last status ${lastStatus}; fixture proxy logs: ${logs.stdout}${logs.stderr}`);
   };
   await waitForStatus(404);
-  await runtime.activate(container.previewId, "pr-1.preview.localhost", endpoint);
+  await runtime.activate(container.previewId, "/pr-1", endpoint);
   assert.deepEqual(await runtime.listRoutes(), [container.previewId]);
   await waitForStatus(200);
   await runtime.deactivate(container.previewId);

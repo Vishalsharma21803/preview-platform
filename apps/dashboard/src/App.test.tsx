@@ -6,7 +6,7 @@ const healthy = { status: 'ok', database: 'ok', worker: 'ok' };
 const preview = {
   id: 'preview-1', repository: 'owner/repository', pullRequestNumber: 42,
   commitSha: 'abcdef0123456789', image: `ghcr.io/owner/repository@sha256:${'a'.repeat(64)}`,
-  status: 'healthy', health: 'healthy', previewUrl: 'http://pr-42.preview.localhost:18080',
+  status: 'healthy', health: 'healthy', previewUrl: 'http://13.63.54.222/pr-42/',
   updatedAt: '2026-10-09T14:00:00Z', expiresAt: '2026-10-10T14:00:00Z',
 };
 
@@ -51,7 +51,7 @@ it('renders real preview metadata and makes only unauthenticated read requests',
   expect(screen.getByText('PR #42')).toBeTruthy();
   expect(screen.getByText('abcdef0')).toBeTruthy();
   expect(screen.getByText('sha256:aaaaaaaaaaaa…')).toBeTruthy();
-  expect((screen.getByRole('link', { name: /Open preview/ }) as HTMLAnchorElement).href).toBe(preview.previewUrl + '/');
+  expect((screen.getByRole('link', { name: /Open preview/ }) as HTMLAnchorElement).href).toBe(preview.previewUrl);
   expect(container.querySelector('form')).toBeNull();
   expect(fetchMock.mock.calls).toEqual([['/api/previews'], ['/healthz']]);
 });

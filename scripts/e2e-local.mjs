@@ -69,9 +69,10 @@ try {
   const proxyIP = (await inspect(proxy)).NetworkSettings.Networks[network].IPAddress;
   const first = await api('/api/deployments', 'POST', input);
   assert.equal(first.status, 202);
-  const host = new URL(first.body.previewUrl).hostname;
+  assert.equal(first.body.previewUrl, 'http://13.63.54.222/pr-42/');
+  const previewPath = new URL(first.body.previewUrl).pathname;
   const routeStatus = () => new Promise((resolve, reject) => {
-    const req = httpRequest(`http://${proxyIP}/healthz`, { headers: { Host: host }, timeout: 1000 }, res => {
+    const req = httpRequest(`http://${proxyIP}${previewPath}healthz`, { timeout: 1000 }, res => {
       res.resume(); resolve(res.statusCode);
     });
     req.on('error', reject); req.on('timeout', () => req.destroy(new Error('route timeout'))); req.end();

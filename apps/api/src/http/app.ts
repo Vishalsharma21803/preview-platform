@@ -33,11 +33,11 @@ export function createApp(deps: { config: Config; repository: DeploymentReposito
       const d = await deps.repository.getDeployment(id);
       if (!d) return res.status(404).json({ error: "deployment not found" });
       const identity = previewIdentity(d.repository, d.pullRequestNumber);
-      return res.json(deploymentToResponse(d, previewUrl(identity.hostname, deps.config)));
+      return res.json(deploymentToResponse(d, previewUrl(identity.pathPrefix, deps.config)));
     } catch (error) { next(error); }
   });
   app.post("/api/deployments", auth, async (req: Request, res: Response, next: NextFunction) => {
-    try { const input = validateCreateRequest(req.body, deps.config); const identity = previewIdentity(input.repository, input.pullRequestNumber); const d = await deps.repository.createDeployment({ ...input, previewId: identity.id, containerPort: input.containerPort, ttlHours: input.ttlHours }, deps.config.MAX_ACTIVE_PREVIEWS); res.status(202).json(deploymentToResponse(d, previewUrl(identity.hostname, deps.config))); }
+    try { const input = validateCreateRequest(req.body, deps.config); const identity = previewIdentity(input.repository, input.pullRequestNumber); const d = await deps.repository.createDeployment({ ...input, previewId: identity.id, containerPort: input.containerPort, ttlHours: input.ttlHours }, deps.config.MAX_ACTIVE_PREVIEWS); res.status(202).json(deploymentToResponse(d, previewUrl(identity.pathPrefix, deps.config))); }
     catch (e) { if (e instanceof CapacityError) return res.status(429).json({ error: e.message }); if (e instanceof RequestError || e instanceof SyntaxError) return res.status(400).json({ error: e.message }); next(e); }
   });
   app.delete("/api/previews/:previewId", auth, async (req: Request, res: Response, next: NextFunction) => { try { const id = param(req.params.previewId); if (!(await deps.worker.removePreview(id))) return res.status(404).json({ error: "preview not found" }); res.status(202).json({ id, status: "deleted" }); } catch (e) { next(e); } });

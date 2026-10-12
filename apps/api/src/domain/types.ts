@@ -25,7 +25,7 @@ export interface PreviewRecord {
   id: string;
   repository: string;
   pullRequestNumber: number;
-  hostname: string;
+  pathPrefix: string;
   status: DeploymentStatus;
   health: "unknown" | "healthy" | "unhealthy";
   deploymentId?: string;
@@ -75,7 +75,7 @@ export function deploymentToResponse(record: DeploymentRecord, url: string): Dep
 export function previewToResponse(record: PreviewRecord, config: Config): PreviewResponse {
   return {
     id: record.id, repository: record.repository, pullRequestNumber: record.pullRequestNumber,
-    hostname: `${record.hostname}.${config.PREVIEW_BASE_DOMAIN}`, previewUrl: previewUrl(record.hostname, config),
+    path: record.pathPrefix, previewUrl: previewUrl(record.pathPrefix, config),
     status: record.status, health: record.health,
     ...(record.deploymentId ? { deploymentId: record.deploymentId } : {}),
     ...(record.commitSha ? { commitSha: record.commitSha } : {}),

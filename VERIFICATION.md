@@ -15,12 +15,12 @@ remained running with its original four containers. No commit or push performed.
 | Command/check | Actual result |
 |---|---|
 | `npm ci` | PASS; root lockfile installs cleanly |
-| `RUN_DOCKER_TESTS=1 npm test` | PASS: 31 backend cases + 19 dashboard/workflow cases; no skipped backend cases; contracts TypeScript check passed |
+| `RUN_DOCKER_TESTS=1 npm test` | PASS: 32 backend cases + 19 dashboard/workflow cases; no skipped backend cases; contracts TypeScript check passed |
 | `npm run typecheck` | PASS across contracts, backend source/tests and dashboard configs |
 | `npm run lint` | PASS; currently TypeScript-based validation, not a separate ESLint/style check |
 | `npm run build` | PASS; contracts, API, Vite production bundle |
 | `npm audit` | PASS; zero reported vulnerabilities, not proof of absence of vulnerabilities |
-| `npm run e2e:local` | PASS; real anonymous GHCR digest pull, Express, PostgreSQL, worker, Docker and Traefik |
+| `npm run e2e:local` | PASS; real anonymous GHCR digest pull, Express, PostgreSQL, worker, Docker and Traefik path request |
 | `docker compose -f infra/docker-compose.yml config` | PASS |
 | `docker build --target preview -t preview-platform-preview:check .` | PASS |
 | `docker build --target dashboard -t preview-platform-dashboard:check .` | PASS |
@@ -51,7 +51,7 @@ with its setup action. No host-wide Docker/npm/git configuration was changed.
 | 9 | CPU/memory/PID/read-only/capability constraints | Yes | Docker command tests and live inspect | PASS |
 | 10 | No host ports/mounts/privileged flags on previews | Yes | Live PortBindings empty; runtime tests; image-declared volumes rejected | PASS |
 | 11 | Route hidden until health succeeds | Yes | Worker event ordering; real file-provider activation tests | PASS |
-| 12 | Return stable preview URL per repository/PR | Yes | Real repeated deployment returns same URL | PASS locally |
+| 12 | Return stable `/pr-<number>/` URL per approved repository PR | Yes | Real repeated deployment returns same path URL; Traefik request uses `/pr-42/healthz` | PASS locally |
 | 13 | Failed replacement preserves serving container and metadata | Yes | Real unhealthy candidate; previous route stays 200; state tests | PASS |
 | 14 | Successful replacement removes old container | Yes | Real E2E confirms one managed container after replacement | PASS; no zero-downtime claim |
 | 15 | New request supersedes in-flight work safely | Yes | Supersession during route activation regression test | PASS at platform request order; live GitHub ordering unverified |

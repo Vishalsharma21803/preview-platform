@@ -56,6 +56,8 @@ Create an untracked `.env` using `.env.example` as reference. Set:
 - `DEPLOYMENT_TOKEN`: high-entropy random value, not the example placeholder.
 - `ALLOWED_IMAGE_NAMESPACE`: lowercase `owner/repository` of your approved image.
 - `ROUTES_DIR`: absolute path to this project's `infra/routes` directory.
+- `PREVIEW_BASE_URL`: public proxy origin/IP, default `http://13.63.54.222`.
+- `PREVIEW_TRAILING_SLASH`: append `/` to generated preview URLs, default `true`.
 - Other local values are already listed in `.env.example`.
 
 Generate a token locally with a password manager, or `openssl rand -hex 32`.
@@ -65,8 +67,9 @@ Do not paste it into chat, commit it, put it in a URL, or put it in frontend con
 node --env-file=.env apps/api/dist/index.js
 ```
 
-Open **http://dashboard.preview.localhost:18080**. The API listens on port 18081;
-its built dashboard proxy uses Docker host-gateway. Restrict host firewall access
+Open **http://127.0.0.1:18080/**. The API listens on port 18081;
+Traefik keeps dashboard `/`, API `/api/*` and `/healthz`, and preview `/pr-<number>/`
+routes separate. Restrict host firewall access
 to your development machine/bridge. The PostgreSQL and Traefik published ports
 are loopback-only. Compose is not an internet deployment configuration.
 
@@ -120,9 +123,9 @@ queued but is not promised ready until health succeeds. Repeat of the current
 identical request reuses its deployment ID. DELETE is retryable; absent preview
 returns 404. During a pull, DELETE may wait for bounded worker work to unwind.
 
-URLs use repository slug/hash plus PR number to avoid collisions, for example
-`owner-frontend-<hash>-pr-42.preview.localhost:18080`. Container names use deployment
-UUIDs, so old and candidate containers can coexist until promotion.
+URLs use the single approved repository's PR path, for example
+`http://13.63.54.222/pr-42/`. Container names use deployment UUIDs, so old and
+candidate containers can coexist until promotion.
 
 Public metadata is deliberately public: repository, commit, image digest, URL,
 status, timestamps and fixed error messages. Do not use this configuration for
@@ -137,7 +140,7 @@ confidential repository/deployment metadata.
 - No image-declared `VOLUME`, host mounts, caller commands, env injection or
   privileged/network options. No application Node/curl dependency for health.
 - Container limits: 256 MiB RAM (no extra swap), 0.5 CPU, 128 PIDs; bounded logs.
-- Ten active previews by default, with at most one extra replacement candidate.
+- One active preview by default, with at most one extra replacement candidate.
 - One-day TTL by default, capped at seven days. Local reconciliation every minute.
 - Failed replacement preserves serving image/commit/URL; failed attempt details
   remain available at deployment endpoint. Missing/stopped containers become
@@ -186,8 +189,8 @@ repositories; explicitly set package visibility to Public before deployment.
    expose your local database to EC2 or silently replace persistence with memory.
 2. **EC2 not configured:** need host OS/architecture/capacity, safe access, available
    ports and process supervision. Never expose Docker remote API.
-3. **TLS/DNS not provisioned:** need actual Cloudflare zone/domain and certificate
-   setup. `PREVIEW_SCHEME=https` changes URLs, not certificates or Traefik TLS.
+3. **TLS/DNS not provisioned:** need actual DNS/IP reachability and certificate
+   setup. `PREVIEW_BASE_URL=https://...` changes URLs, not certificates or Traefik TLS.
 4. **Workflow execution not proven:** static YAML validation is not a live GitHub
    build/push/deploy/close test.
 5. **No hard image-pull disk quota or network egress isolation:** read-only root,

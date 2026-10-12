@@ -32,7 +32,7 @@ export class MemoryRepository implements DeploymentRepository {
       this.deployments.set(record.id, record);
       this.previews.set(input.previewId, {
         ...previous, id: input.previewId, repository: input.repository, pullRequestNumber: input.pullRequestNumber,
-        hostname: previewIdentity(input.repository, input.pullRequestNumber).hostname,
+        pathPrefix: previewIdentity(input.repository, input.pullRequestNumber).pathPrefix,
         status: "queued", health: previous?.containerId ? previous.health : "unknown", requestedDeploymentId: record.id,
         deploymentId: previous?.containerId ? previous.deploymentId : undefined,
         commitSha: previous?.containerId ? previous.commitSha : undefined,

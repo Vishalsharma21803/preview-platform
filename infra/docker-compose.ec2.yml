@@ -1,0 +1,51 @@
+# Standalone EC2 MVP stack. API/worker runs on the native Linux host via systemd.
+name: preview-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - /opt/preview-platform/config/postgres.env
+    environment:
+      POSTGRES_DB: preview_platform
+      POSTGRES_USER: preview
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U preview -d preview_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "80:80"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./routes:/etc/traefik/routes:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - runtime
+
+  dashboard:
+    image: preview-platform-dashboard:ec2
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - runtime
+
+volumes:
+  postgres-data:
+
+networks:
+  runtime:
+    name: preview-platform-runtime

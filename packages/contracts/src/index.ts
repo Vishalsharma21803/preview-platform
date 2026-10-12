@@ -31,7 +31,7 @@ export interface PreviewResponse {
   id: string;
   repository: string;
   pullRequestNumber: number;
-  hostname: string;
+  path: string;
   previewUrl: string;
   deploymentId?: string;
   status: DeploymentStatus;

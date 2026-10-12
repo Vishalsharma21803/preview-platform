@@ -31,11 +31,16 @@ test("public reads, bearer protection, digest policy, async deployment, idempote
   assert.equal(response.status, 202);
   const created = await response.json();
   assert.equal(created.status, "queued");
+  assert.equal(created.previewUrl, "http://13.63.54.222/pr-3/");
   const duplicate = await (await request("POST", "/api/deployments", body, config.DEPLOYMENT_TOKEN)).json();
   assert.equal(duplicate.id, created.id);
   await worker.processOne();
   const ready = await (await request("GET", `/api/deployments/${created.id}`)).json();
   assert.equal(ready.status, "healthy");
+  const preview = await (await request("GET", `/api/previews/${created.previewId}`)).json();
+  assert.equal(preview.path, "/pr-3");
+  assert.equal(preview.previewUrl, "http://13.63.54.222/pr-3/");
+  assert.equal((await request("POST", "/api/deployments", { ...body, pullRequestNumber: body.pullRequestNumber + 1 }, config.DEPLOYMENT_TOKEN)).status, 429);
   assert.equal((await request("DELETE", `/api/previews/${created.previewId}`)).status, 401);
   assert.equal((await request("DELETE", `/api/previews/${created.previewId}`, undefined, config.DEPLOYMENT_TOKEN)).status, 202);
   assert.equal(runtime.containers.size, 0); assert.equal(runtime.routes.size, 0);

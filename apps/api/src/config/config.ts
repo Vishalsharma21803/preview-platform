@@ -11,13 +11,17 @@ const envSchema = z.object({
   DOCKER_COMMAND_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
   DOCKER_PULL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(1800000).default(300000),
   HEALTH_CHECK_TIMEOUT_MS: z.coerce.number().int().min(100).max(10000).default(2000),
-  PREVIEW_BASE_DOMAIN: z.string().max(190).regex(/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/).default("preview.localhost"),
-  PREVIEW_SCHEME: z.enum(["http", "https"]).default("http"),
-  PREVIEW_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  PREVIEW_BASE_URL: z.string().url().refine(value => {
+    try {
+      const parsed = new URL(value);
+      return ["http:", "https:"].includes(parsed.protocol) && parsed.pathname === "/" && !parsed.search && !parsed.hash;
+    } catch { return false; }
+  }).transform(value => value.replace(/\/+$/, "")).default("http://13.63.54.222"),
+  PREVIEW_TRAILING_SLASH: z.preprocess(value => typeof value === "string" ? value.toLowerCase() === "true" : value, z.boolean()).default(true),
   TRAEFIK_NETWORK: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$/).default("traefik-public"),
   WORKER_POLL_MS: z.coerce.number().int().min(100).max(60000).default(1000),
   RECONCILE_INTERVAL_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
-  MAX_ACTIVE_PREVIEWS: z.coerce.number().int().min(1).max(100).default(10),
+  MAX_ACTIVE_PREVIEWS: z.coerce.number().int().min(1).max(100).default(1),
   DEFAULT_TTL_HOURS: z.coerce.number().positive().max(168).default(24),
   MAX_TTL_HOURS: z.coerce.number().positive().max(168).default(168),
   PREVIEW_MEMORY: z.string().regex(/^(?:[6-9][4-9]|[1-9][0-9]{2,3})m$/).default("256m"),

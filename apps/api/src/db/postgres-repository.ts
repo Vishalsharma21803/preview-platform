@@ -20,7 +20,7 @@ function deployment(row: Row): DeploymentRecord {
 function preview(row: Row): PreviewRecord {
   return {
     id: String(row.id), repository: String(row.repository), pullRequestNumber: Number(row.pull_request_number),
-    hostname: String(row.hostname), status: row.status as PreviewRecord["status"], health: row.health as PreviewRecord["health"],
+    pathPrefix: String(row.path_prefix), status: row.status as PreviewRecord["status"], health: row.health as PreviewRecord["health"],
     ...(row.deployment_id ? { deploymentId: String(row.deployment_id) } : {}),
     ...(row.requested_deployment_id ? { requestedDeploymentId: String(row.requested_deployment_id) } : {}),
     runtimeState: row.runtime_state as PreviewRecord["runtimeState"],
@@ -67,14 +67,14 @@ export class PostgresRepository implements DeploymentRepository {
         (id,preview_id,repository,pull_request_number,commit_sha,image,container_port,ttl_hours)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [id, input.previewId, input.repository, input.pullRequestNumber, input.commitSha, input.image, input.containerPort, input.ttlHours]);
-      await client.query(`INSERT INTO previews (id,repository,pull_request_number,hostname,status,health,requested_deployment_id,expires_at)
+      await client.query(`INSERT INTO previews (id,repository,pull_request_number,path_prefix,status,health,requested_deployment_id,expires_at)
         VALUES ($1,$2,$3,$4,'queued','unknown',$5,NOW()+$6::double precision*INTERVAL '1 hour')
         ON CONFLICT (id) DO UPDATE SET status='queued', health=CASE WHEN previews.container_id IS NULL THEN 'unknown' ELSE previews.health END,
         deployment_id=CASE WHEN previews.container_id IS NULL THEN NULL ELSE previews.deployment_id END,
         commit_sha=CASE WHEN previews.container_id IS NULL THEN NULL ELSE previews.commit_sha END,
         image=CASE WHEN previews.container_id IS NULL THEN NULL ELSE previews.image END,
         requested_deployment_id=EXCLUDED.requested_deployment_id,expires_at=EXCLUDED.expires_at,updated_at=NOW()`,
-      [input.previewId, input.repository, input.pullRequestNumber, previewIdentity(input.repository, input.pullRequestNumber).hostname,
+      [input.previewId, input.repository, input.pullRequestNumber, previewIdentity(input.repository, input.pullRequestNumber).pathPrefix,
         id, input.ttlHours]);
       return deployment(inserted.rows[0]);
     });

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadConfig } from "../src/config/config.js";
-import { previewIdentity, validateCreateRequest } from "../src/domain/validation.js";
+import { previewIdentity, previewUrl, validateCreateRequest } from "../src/domain/validation.js";
 import { body, config } from "./helpers.js";
 
 test("accepts digest-pinned images within one configured repository scope", () => {
@@ -15,8 +15,15 @@ test("rejects tags, lookalike namespaces, foreign repositories and arbitrary run
     { privileged: true }, { ttlHours: 169 }, { containerPort: 65536 },
   ]) assert.throws(() => validateCreateRequest({ ...body, ...patch }, config));
 });
-test("namespace configuration requires owner/repository and identity is collision resistant", () => {
+test("namespace configuration requires owner/repository and path identity is PR-scoped", () => {
   assert.throws(() => loadConfig({ ALLOWED_IMAGE_NAMESPACE: "acme" }));
-  assert.notEqual(previewIdentity("acme/a-b", 1).id, previewIdentity("acme/a_b", 1).id);
-  assert.match(previewIdentity("Acme/my-app", 12).id, /^acme-my-app-[a-f0-9]{10}-pr-12$/);
+  assert.equal(previewIdentity("acme/a-b", 1).id, "pr-1");
+  assert.equal(previewIdentity("Acme/my-app", 12).pathPrefix, "/pr-12");
+  assert.equal(previewIdentity("Acme/my-app", 12).id, previewIdentity("acme/other", 12).id);
+});
+
+test("preview URL uses configurable base origin and trailing slash", () => {
+  const identity = previewIdentity(body.repository, 42);
+  assert.equal(previewUrl(identity.pathPrefix, config), "http://13.63.54.222/pr-42/");
+  assert.equal(previewUrl(identity.pathPrefix, { ...config, PREVIEW_BASE_URL: "http://example.test/", PREVIEW_TRAILING_SLASH: false }), "http://example.test/pr-42");
 });

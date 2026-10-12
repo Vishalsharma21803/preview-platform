@@ -18,7 +18,7 @@ Node, npm, and PostgreSQL Docker images are available for real local tests.
 - Platform accepts exactly one configured public GHCR repository namespace.
 - Images must be digest-pinned, self-contained, and compatible with read-only
   filesystem and dropped capabilities. Image-declared volumes are rejected.
-- Default limits: 0.5 CPU, 256 MiB, 128 PIDs, 10 active previews, 24h TTL, max 168h.
+- Default limits: 0.5 CPU, 256 MiB, 128 PIDs, 1 active preview, 24h TTL, max 168h.
 - The single worker/API process runs on the Linux Docker host. It is not isolated
   from Docker authority. Do not expose this development setup to the internet.
 - No dashboard form, login, backend dependencies for preview images, arbitrary
@@ -72,8 +72,9 @@ Node, npm, and PostgreSQL Docker images are available for real local tests.
 - Scoped unused-image cleanup: never force or globally prune; protect unrelated
   containers and shared image aliases.
 
-Routing implementation detail: atomic Traefik file-provider routes replace the
-initial Docker-label routing sketch. Labels retain ownership metadata only.
+Routing implementation detail: atomic Traefik file-provider path routes replace the
+initial Docker-label routing sketch. Each `/pr-<number>/` route uses `PathPrefix`
+and `StripPrefix`; labels retain ownership metadata only.
 This avoids routing unready candidates and removes Traefik's Docker socket mount.
 File publication and DB commit are not a distributed transaction; restart repairs
 interrupted switches. Traefik reload is asynchronous, not zero-downtime guaranteed.

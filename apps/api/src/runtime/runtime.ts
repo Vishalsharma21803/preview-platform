@@ -22,7 +22,7 @@ export interface RuntimeAdapter {
   healthCheck(endpoint: string, path: string, attempts: number, intervalMs: number): Promise<boolean>;
   remove(container: RuntimeContainer): Promise<void>;
   listManaged(): Promise<RuntimeContainer[]>;
-  activate(previewId: string, hostname: string, endpoint: string): Promise<void>;
+  activate(previewId: string, pathPrefix: string, endpoint: string): Promise<void>;
   deactivate(previewId: string): Promise<void>;
   listRoutes(): Promise<string[]>;
   removeImage(image: string): Promise<void>;
@@ -115,7 +115,7 @@ export class DockerRuntime implements RuntimeAdapter {
       }) : [];
     } catch { throw new Error("runtime operation failed"); }
   }
-  activate(previewId: string, hostname: string, endpoint: string) { return this.routes.activate(previewId, hostname, endpoint); }
+  activate(previewId: string, pathPrefix: string, endpoint: string) { return this.routes.activate(previewId, pathPrefix, endpoint); }
   deactivate(previewId: string) { return this.routes.deactivate(previewId); }
   listRoutes() { return this.routes.list(); }
   private isMissing(error: unknown, kind: "image" | "container") {
