@@ -1,0 +1,11 @@
+http:
+  routers:
+    dashboard:
+      rule: Host(`dashboard.preview.localhost`)
+      entryPoints: [web]
+      service: dashboard
+  services:
+    dashboard:
+      loadBalancer:
+        servers:
+          - url: http://dashboard:80

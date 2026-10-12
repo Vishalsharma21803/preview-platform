@@ -1,0 +1,47 @@
+name: preview-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: preview_platform
+      POSTGRES_USER: preview
+      POSTGRES_PASSWORD: preview
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U preview -d preview_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  traefik:
+    image: traefik:v3.6
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "127.0.0.1:18080:80"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./routes:/etc/traefik/routes:ro
+    networks:
+      - runtime
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: dashboard
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - runtime
+
+volumes:
+  postgres-data:
+
+networks:
+  runtime:
+    name: preview-platform-runtime

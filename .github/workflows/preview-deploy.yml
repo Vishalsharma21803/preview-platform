@@ -1,0 +1,201 @@
+name: Preview trusted deploy and cleanup
+
+on:
+  workflow_run:
+    workflows: [Preview image build]
+    types: [completed]
+  pull_request_target:
+    types: [closed]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+# Serialize this repository's mutations. No PR checkout or PR executable artifacts.
+concurrency:
+  group: preview-platform-trusted-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: preview-platform
+    timeout-minutes: 20
+    steps:
+      - name: Validate trusted run context
+        id: validate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.payload.workflow_run.id });
+            const { data: workflow } = await github.rest.actions.getWorkflow({ owner, repo, workflow_id: 'preview.yml' });
+            const repository = context.payload.repository;
+            if (run.repository.id !== repository.id || run.head_repository?.id !== repository.id ||
+                run.workflow_id !== workflow.id || run.event !== 'pull_request' ||
+                run.status !== 'completed' || run.conclusion !== 'success' || !/^[0-9a-f]{40}$/.test(run.head_sha)) {
+              throw new Error('Run repository, workflow, event, conclusion or head SHA rejected');
+            }
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: run.id, per_page: 100 });
+            const matches = artifacts.filter(a => a.name === 'preview-metadata' && !a.expired);
+            if (matches.length !== 1 || matches[0].size_in_bytes > 16384) throw new Error('Expected one small metadata artifact');
+            core.setOutput('artifact_id', String(matches[0].id));
+            core.setOutput('run_id', String(run.id));
+            core.setOutput('head_sha', run.head_sha);
+            core.setOutput('prs', JSON.stringify(run.pull_requests.map(pr => pr.number)));
+
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.validate.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/preview-metadata
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.validate.outputs.run_id }}
+
+      - name: Validate metadata and open same-repository PR
+        id: metadata
+        uses: actions/github-script@v7
+        env:
+          EXPECTED_SHA: ${{ steps.validate.outputs.head_sha }}
+          RUN_PRS: ${{ steps.validate.outputs.prs }}
+          METADATA_DIR: ${{ runner.temp }}/preview-metadata
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const filename = path.join(process.env.METADATA_DIR, 'metadata.json');
+            const stat = fs.lstatSync(filename);
+            if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096) throw new Error('Invalid metadata file');
+            const metadata = JSON.parse(fs.readFileSync(filename, 'utf8'));
+            if (typeof metadata.digest !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(metadata.digest) ||
+                !Number.isSafeInteger(metadata.pr) || metadata.pr <= 0 || metadata.headSha !== process.env.EXPECTED_SHA ||
+                !JSON.parse(process.env.RUN_PRS).includes(metadata.pr)) {
+              throw new Error('Invalid digest, PR number or commit SHA');
+            }
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: metadata.pr });
+            if (pr.state !== 'open' || pr.head.repo?.id !== context.payload.repository.id ||
+                pr.base.repo.id !== context.payload.repository.id || pr.head.sha !== metadata.headSha) {
+              throw new Error('PR is closed, stale or from another repository');
+            }
+            core.setOutput('pr', String(pr.number));
+            core.setOutput('sha', pr.head.sha);
+            // Never trust an artifact-provided image URL or namespace.
+            core.setOutput('image', `ghcr.io/${owner.toLowerCase()}/${repo.toLowerCase()}@${metadata.digest}`);
+
+      - name: Deploy immutable image, poll, update PR
+        uses: actions/github-script@v7
+        env:
+          PLATFORM_API_URL: ${{ vars.PREVIEW_PLATFORM_API_URL }}
+          DEPLOYMENT_TOKEN: ${{ secrets.PREVIEW_PLATFORM_TOKEN }}
+          PR_NUMBER: ${{ steps.metadata.outputs.pr }}
+          HEAD_SHA: ${{ steps.metadata.outputs.sha }}
+          IMAGE: ${{ steps.metadata.outputs.image }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = Number(process.env.PR_NUMBER);
+            const base = new URL(process.env.PLATFORM_API_URL);
+            if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) throw new Error('Use an HTTPS platform API URL');
+            if (!process.env.DEPLOYMENT_TOKEN) throw new Error('Platform token missing');
+            async function api(path, options = {}) {
+              const response = await fetch(new URL(path, base), {
+                ...options, redirect: 'error', signal: AbortSignal.timeout(20000),
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEPLOYMENT_TOKEN}` },
+              });
+              if (!response.ok) throw new Error(`Platform API returned ${response.status}`);
+              return response.json();
+            }
+            async function currentPR() {
+              const { data } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              return data;
+            }
+            const pr = await currentPR();
+            if (pr.state !== 'open' || pr.head.repo?.id !== context.payload.repository.id || pr.head.sha !== process.env.HEAD_SHA) {
+              throw new Error('PR changed before submission');
+            }
+            let deployment;
+            let status = 'failed';
+            let url;
+            try {
+              deployment = await api('/api/deployments', { method: 'POST', body: JSON.stringify({
+                repository: `${owner}/${repo}`, pullRequestNumber: prNumber,
+                commitSha: process.env.HEAD_SHA, image: process.env.IMAGE, containerPort: 80,
+              }) });
+              if (typeof deployment.id !== 'string') throw new Error('Missing deployment ID');
+              for (let attempt = 0; attempt < 60; attempt++) {
+                const result = await api(`/api/deployments/${encodeURIComponent(deployment.id)}`);
+                status = result.status;
+                if (status === 'healthy') { url = result.previewUrl; break; }
+                if (['failed', 'deleted', 'deleting'].includes(status)) throw new Error('Deployment failed or removed');
+                await new Promise(resolve => setTimeout(resolve, 10000));
+              }
+              if (status !== 'healthy') throw new Error('Deployment polling timed out');
+            } catch (error) {
+              core.setFailed(error.message);
+            }
+            const latest = await currentPR();
+            if (latest.state !== 'open') {
+              if (typeof deployment?.previewId === 'string') await api(`/api/previews/${encodeURIComponent(deployment.previewId)}`, { method: 'DELETE' });
+              return;
+            }
+            if (latest.head.sha !== process.env.HEAD_SHA) return;
+            const marker = '<!-- preview-platform -->';
+            const safeUrl = typeof url === 'string' && /^https?:\/\//.test(url) ? new URL(url).href : null;
+            const body = [marker, '### Preview environment', '',
+              status === 'healthy' && safeUrl ? `✅ Ready — [Open preview](<${safeUrl}>)` : `⚠️ Deployment status: **${status}**`,
+              '', `Commit: \`${process.env.HEAD_SHA}\``, `Image: \`${process.env.IMAGE}\``,
+              '', `[Workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId})`,
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: prNumber, per_page: 100 });
+            const existing = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.includes(marker));
+            if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
+
+  cleanup:
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-latest
+    environment: preview-platform
+    timeout-minutes: 15
+    steps:
+      # pull_request_target closed and schedule use trusted workflow code only.
+      - name: Remove this repository's closed PR previews
+        uses: actions/github-script@v7
+        env:
+          PLATFORM_API_URL: ${{ vars.PREVIEW_PLATFORM_API_URL }}
+          DEPLOYMENT_TOKEN: ${{ secrets.PREVIEW_PLATFORM_TOKEN }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const repository = `${owner}/${repo}`;
+            const base = new URL(process.env.PLATFORM_API_URL);
+            if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) throw new Error('Use an HTTPS platform API URL');
+            if (!process.env.DEPLOYMENT_TOKEN) throw new Error('Platform token missing');
+            if (context.eventName === 'pull_request_target' && (
+              context.payload.action !== 'closed' || context.payload.pull_request.head.repo?.id !== context.payload.repository.id
+            )) return;
+            async function api(path, method = 'GET') {
+              const response = await fetch(new URL(path, base), {
+                method, redirect: 'error', signal: AbortSignal.timeout(20000),
+                headers: { Authorization: `Bearer ${process.env.DEPLOYMENT_TOKEN}` },
+              });
+              if (method === 'DELETE' && response.status === 404) return;
+              if (!response.ok) throw new Error(`Platform API returned ${response.status}`);
+              return response.json();
+            }
+            const previews = await api('/api/previews');
+            if (!Array.isArray(previews)) throw new Error('Expected preview array');
+            for (const preview of previews) {
+              if (typeof preview.repository !== 'string' || preview.repository.toLowerCase() !== repository.toLowerCase()) continue;
+              if (!Number.isSafeInteger(preview.pullRequestNumber) || preview.pullRequestNumber <= 0 || typeof preview.id !== 'string') continue;
+              if (context.eventName === 'pull_request_target' && preview.pullRequestNumber !== context.payload.pull_request.number) continue;
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: preview.pullRequestNumber });
+              if (pr.state !== 'closed' || pr.base.repo.id !== context.payload.repository.id) continue;
+              await api(`/api/previews/${encodeURIComponent(preview.id)}`, 'DELETE');
+              core.info(`Removed closed PR #${pr.number} preview`);
+            }
