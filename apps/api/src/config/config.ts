@@ -21,7 +21,7 @@ const envSchema = z.object({
   TRAEFIK_NETWORK: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$/).default("traefik-public"),
   WORKER_POLL_MS: z.coerce.number().int().min(100).max(60000).default(1000),
   RECONCILE_INTERVAL_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
-  MAX_ACTIVE_PREVIEWS: z.coerce.number().int().min(1).max(100).default(2),
+  MAX_ACTIVE_PREVIEWS: z.coerce.number().int().min(1).max(100).default(5),
   DEFAULT_TTL_HOURS: z.coerce.number().positive().max(168).default(24),
   MAX_TTL_HOURS: z.coerce.number().positive().max(168).default(168),
   PREVIEW_MEMORY: z.string().regex(/^(?:[6-9][4-9]|[1-9][0-9]{2,3})m$/).default("256m"),

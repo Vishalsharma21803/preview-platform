@@ -28,7 +28,7 @@ await writeFile(platformFile, [
   'TRAEFIK_NETWORK=preview-platform-runtime',
   `ROUTES_DIR=${base}/app/infra/routes`,
   'HEALTH_CHECK_PATH=/healthz',
-  'MAX_ACTIVE_PREVIEWS=2',
+  'MAX_ACTIVE_PREVIEWS=5',
   'DEFAULT_TTL_HOURS=24',
   'MAX_TTL_HOURS=168',
   'PREVIEW_MEMORY=256m',

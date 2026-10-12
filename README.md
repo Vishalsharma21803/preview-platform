@@ -140,7 +140,7 @@ confidential repository/deployment metadata.
 - No image-declared `VOLUME`, host mounts, caller commands, env injection or
   privileged/network options. No application Node/curl dependency for health.
 - Container limits: 256 MiB RAM (no extra swap), 0.5 CPU, 128 PIDs; bounded logs.
-- Two active previews by default, with at most one extra replacement candidate
+- Five active previews by default, with at most one extra replacement candidate
   during an individual PR replacement.
 - One-day TTL by default, capped at seven days. Local reconciliation every minute.
 - Failed replacement preserves serving image/commit/URL; failed attempt details

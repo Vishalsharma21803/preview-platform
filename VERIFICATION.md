@@ -30,9 +30,9 @@ no TLS, production hardening, or comprehensive security certification claim.
 
 ## Live concurrent preview verification — PR #2
 
-The initial one-preview throttle was an operational setting, not an architectural
+The initial preview throttle was an operational setting, not an architectural
 constraint. It rejected PR #2 with HTTP 429 while PR #1 was healthy. The EC2
-runtime setting was changed to `MAX_ACTIVE_PREVIEWS=2` and the service restarted.
+runtime setting was changed to `MAX_ACTIVE_PREVIEWS=5` and the service restarted.
 The already-published PR #2 image was then submitted to the same API without
 closing PR #1.
 

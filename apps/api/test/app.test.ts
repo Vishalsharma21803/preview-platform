@@ -40,8 +40,10 @@ test("public reads, bearer protection, digest policy, async deployment, idempote
   const preview = await (await request("GET", `/api/previews/${created.previewId}`)).json();
   assert.equal(preview.path, "/pr-3");
   assert.equal(preview.previewUrl, "http://13.63.54.222/pr-3/");
-  assert.equal((await request("POST", "/api/deployments", { ...body, pullRequestNumber: body.pullRequestNumber + 1 }, config.DEPLOYMENT_TOKEN)).status, 202);
-  assert.equal((await request("POST", "/api/deployments", { ...body, pullRequestNumber: body.pullRequestNumber + 2 }, config.DEPLOYMENT_TOKEN)).status, 429);
+  for (const pullRequestNumber of [body.pullRequestNumber + 1, body.pullRequestNumber + 2, body.pullRequestNumber + 3, body.pullRequestNumber + 4]) {
+    assert.equal((await request("POST", "/api/deployments", { ...body, pullRequestNumber }, config.DEPLOYMENT_TOKEN)).status, 202);
+  }
+  assert.equal((await request("POST", "/api/deployments", { ...body, pullRequestNumber: body.pullRequestNumber + 5 }, config.DEPLOYMENT_TOKEN)).status, 429);
   assert.equal((await request("DELETE", `/api/previews/${created.previewId}`)).status, 401);
   assert.equal((await request("DELETE", `/api/previews/${created.previewId}`, undefined, config.DEPLOYMENT_TOKEN)).status, 202);
   assert.equal(runtime.containers.size, 0); assert.equal(runtime.routes.size, 0);
